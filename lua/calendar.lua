@@ -13,7 +13,7 @@ M.__index = M
 local config = {
 	actions = {
 		insert_link = function(date)
-			return date and vim.api.nvim_put({ date:format("%Y-%m-%d") }, "c", true, true)
+			return date and vim.api.nvim_put({ "<" .. date:format("%Y-%m-%d") .. ">" }, "c", true, true)
 		end,
 		open_daily = function() end,
 		echo_date = function(date)
@@ -61,11 +61,11 @@ local y_offset = 2 -- one border cell and one padding cell
 function M.open(self, callback, opts)
 	local get_window_opts = function()
 		return {
-			relative = "editor",
+			relative = opts.relative or "editor",
 			width = width,
 			height = height,
 			style = "minimal",
-			border = "double",
+			border = "single",
 			row = opts.row,
 			-- or vim.o.lines / 2 - (y_offset + height) / 2,
 			col = opts.col,
@@ -93,16 +93,16 @@ function M.open(self, callback, opts)
 	-- 	once = true,
 	-- })
 
-	-- vim.api.nvim_create_autocmd("VimResized", {
-	-- 	buffer = self.buf,
-	-- 	group = calendar_augroup,
-	-- 	callback = function()
-	-- 		if self.win then
-	-- 			vim.api.nvim_win_set_config(self.win, get_window_opts())
-	-- 		end
-	-- 	end,
-	-- })
-	--
+	vim.api.nvim_create_autocmd("VimResized", {
+		buffer = self.buf,
+		group = calendar_augroup,
+		callback = function()
+			if self.win then
+				vim.api.nvim_win_set_config(self.win, get_window_opts())
+			end
+		end,
+	})
+
 	self:render()
 
 	for _, map in ipairs(config.keys) do
@@ -363,8 +363,11 @@ end)
 
 vim.keymap.set("i", "@", function()
 	local pos = vim.api.nvim_win_get_cursor(0)
+	vim.api.nvim_put({ "@" }, "c", true, true)
+	vim.cmd.stopinsert()
 	M:open(config.actions.insert_link, {
-		row = pos[1] + 5,
-		col = pos[2],
+		relative = "cursor",
+		row = 1,
+		col = -1,
 	})
 end)
