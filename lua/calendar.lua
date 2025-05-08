@@ -1,5 +1,5 @@
 -- Adapted from nvim-orgmode/orgmode
-local Date = require("calendar._date")
+local Date = require("calendar.date")
 local config = require("calendar.config")
 local api, fn = vim.api, vim.fn
 
@@ -23,6 +23,7 @@ local function new_date(opts)
 end
 
 function M.new(opts, callback)
+	opts = opts or {}
 	return setmetatable({
 		win = nil,
 		buf = nil,
@@ -352,3 +353,7 @@ end
 
 --- TODO: highlight
 function M:hl() end
+
+local cal = M.new()
+
+cal:open()

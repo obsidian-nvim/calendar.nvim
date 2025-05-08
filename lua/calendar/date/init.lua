@@ -1,6 +1,6 @@
 ---@class Calendar.date: osdateparam
 ---@field src? string original string for debug
----@field format? "asctime" | "rfc3339" ...
+---@field format_string? "asctime" | "rfc3339" ...
 local M = {}
 M.__index = M
 
@@ -42,7 +42,7 @@ end
 function M.new(src)
 	local params, format = parse(src)
 	params.src = type(src) == "string" and src or nil
-	params.format = format
+	params.format_string = format
 	setmetatable(params, M)
 	return params
 end
@@ -63,6 +63,50 @@ end
 function M:__eq(rhs)
 	local other = type(rhs) == "string" and M.new(rhs) or rhs
 	return self.year == other.year and self.month == other.month and self.day == other.day
+end
+
+function M.today()
+	return M.new(os.date("*t"))
+end
+
+---@param format string
+function M:format(format)
+	local int = os.time(self)
+	return os.date(format, int)
+end
+
+function M:start_of(span)
+	local opts = {
+		day = { hour = 0, min = 0 },
+		month = { day = 1, hour = 0, min = 0 },
+		year = { month = 1, day = 1, hour = 0, min = 0 },
+		hour = { min = 0 },
+	}
+	local new_attrs = opts[span]
+
+	-- TODO: week
+	local copy = vim.deepcopy(self)
+	return vim.tbl_extend("force", copy, new_attrs)
+end
+
+function M:end_of(span)
+	local opts = {
+		day = { hour = 23, min = 59 },
+		year = { month = 12, day = 31, hour = 23, min = 59 },
+		hour = { min = 59 },
+		month = { day = 29, hour = 23, min = 59 },
+	}
+
+	local new_attrs = opts[span]
+
+	-- if span == "month" then
+	-- 	local date = os_date(self.timestamp)
+	-- 	return self:set({ day = OrgDate._days_of_month(date) }):end_of("day")
+	-- end
+
+	-- TODO: week
+	local copy = vim.deepcopy(self)
+	return vim.tbl_extend("force", copy, new_attrs)
 end
 
 return M

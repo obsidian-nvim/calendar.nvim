@@ -40,4 +40,33 @@ T["metamethods"]["__tostring"] = function()
 	local date = M.new("1977-1-1")
 	eq(tostring(date), 'Date("1977-1-1")')
 end
+
+T["start_of"] = new_set()
+
+T["start_of"] = function()
+	local date = M.new({
+		year = 1977,
+		month = 1,
+		day = 5,
+	})
+	local start_of_month = date:start_of("month")
+
+	eq(date.day, 5)
+	eq(start_of_month.day, 1)
+end
+
+T["end_of"] = new_set()
+
+T["end_of"] = function()
+	local date = M.new({
+		year = 1977,
+		month = 1,
+		day = 5,
+	})
+	local end_of_month = date:end_of("month")
+
+	eq(date.day, 5)
+	eq(end_of_month.day, 31)
+end
+
 return T
