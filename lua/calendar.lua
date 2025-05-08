@@ -1,110 +1,70 @@
-local Date = require("orgmode.objects.date")
+-- Adapted from nvim-orgmode/orgmode
+local Date = require("calendar.date")
+local config = require("calendar.config")
+local api, fn = vim.api, vim.fn
 
-local M = {
-	win = nil,
-	buf = nil,
-	namespace = vim.api.nvim_create_namespace("calendar"),
-	select_state = 0,
-	date = Date.today(),
-}
+local M = {}
 
 M.__index = M
 
-local config = {
-	actions = {
-		insert_link = function(date)
-			return date and vim.api.nvim_put({ "<" .. date:format("%Y-%m-%d") .. ">" }, "c", true, true)
-		end,
-		open_daily = function() end,
-		echo_date = function(date)
-			return date and vim.notify(date:format("%Y-%m-%d"), 2)
-		end,
-	},
-	keys = {
-		{
-			"n",
-			"q",
-			function(self)
-				self:close()
-			end,
-		},
+---@param opts table
+local function new_date(opts)
+	local date = opts.date
 
-		{
-			"n",
-			"<cr>",
-			function(self)
-				self:select()
-			end,
-		},
-		{
-			"n",
-			">",
-			function(self)
-				self:forward()
-			end,
-		},
-		{
-			"n",
-			"<",
-			function(self)
-				self:backward()
-			end,
-		},
-	},
-}
+	if type(date) == "function" then
+		return date()
+	elseif type(date) == "table" then -- TODO: check if mt is Date obj
+		return date
+	else
+		return Date.today()
+	end
+end
+
+function M.new(opts, callback)
+	return setmetatable({
+		win = nil,
+		buf = nil,
+		namespace = api.nvim_create_namespace("calendar"),
+		select_state = 0,
+		date = new_date(opts),
+		opts = opts,
+		callback = callback or config.actions.echo_date,
+	}, M)
+end
 
 local width = 36
 local height = 14
 local x_offset = 1 -- one border cell
 local y_offset = 2 -- one border cell and one padding cell
 
-function M.open(self, callback, opts)
-	local get_window_opts = function()
-		return {
-			relative = opts.relative or "editor",
-			width = width,
-			height = height,
-			style = "minimal",
-			border = "single",
-			row = opts.row,
-			-- or vim.o.lines / 2 - (y_offset + height) / 2,
-			col = opts.col,
-			-- or vim.o.columns / 2 - (x_offset + width) / 2,
-			title = self.title or "Calendar",
-			title_pos = "center",
-		}
-	end
+function M:win_opts()
+	local opts = self.opts
+	return {
+		relative = opts.relative or "editor",
+		width = width,
+		height = height,
+		style = "minimal",
+		border = "single",
+		row = opts.row or vim.o.lines / 2 - (y_offset + height) / 2,
+		col = opts.co or vim.o.columns / 2 - (x_offset + width) / 2,
+		title = self.title or "Calendar",
+		title_pos = "center",
+	}
+end
 
-	self.prev_win = vim.api.nvim_get_current_win()
-	self.buf = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_buf_set_name(self.buf, "orgcalendar")
-	self.win = vim.api.nvim_open_win(self.buf, true, get_window_opts())
-
-	vim.bo[self.buf].filetype = "calendar"
-
-	local calendar_augroup = vim.api.nvim_create_augroup("calendar.nvim", { clear = true })
-
-	-- vim.api.nvim_create_autocmd("BufWipeout", {
-	-- 	buffer = self.buf,
-	-- 	group = calendar_augroup,
-	-- 	callback = function()
-	-- 		self:close()
-	-- 	end,
-	-- 	once = true,
-	-- })
-
-	vim.api.nvim_create_autocmd("VimResized", {
+local function set_events(self)
+	api.nvim_create_autocmd("VimResized", {
 		buffer = self.buf,
-		group = calendar_augroup,
+		group = self.augroup,
 		callback = function()
 			if self.win then
-				vim.api.nvim_win_set_config(self.win, get_window_opts())
+				api.nvim_win_set_config(self.win, self:win_opts())
 			end
 		end,
 	})
+end
 
-	self:render()
-
+local function set_keys(self)
 	for _, map in ipairs(config.keys) do
 		local mode, lhs, rhs = unpack(map)
 		self:map(mode, lhs, rhs)
@@ -123,8 +83,31 @@ function M.open(self, callback, opts)
 	-- 		self:clear_time()
 	-- 	end, map_opts)
 	-- end
-	-- self:jump_day()
-	self.callback = callback or config.actions.echo_date
+end
+
+function M:jump_day()
+	local search_day = (self.date or Date.today()):format("%d")
+	fn.cursor(2, 1)
+	fn.search(search_day, "W")
+end
+
+function M.open(self)
+	self.prev_win = api.nvim_get_current_win()
+	self.buf = api.nvim_create_buf(false, true)
+	self.win = api.nvim_open_win(self.buf, true, self:win_opts())
+	vim.bo[self.buf].filetype = "calendar" -- triggers all ftplugin options
+	self:render()
+	self.augroup = api.nvim_create_augroup("calendar.nvim", { clear = true })
+	set_events(self)
+	set_keys(self)
+	self:jump_day()
+end
+
+function M:close()
+	api.nvim_buf_delete(self.buf, { force = true })
+	api.nvim_set_current_win(self.prev_win)
+	self.win = nil
+	self.buf = nil
 end
 
 function M:map(mode, lhs, rhs)
@@ -132,17 +115,6 @@ function M:map(mode, lhs, rhs)
 	vim.keymap.set(mode, lhs, function()
 		rhs(self)
 	end, map_opts)
-end
-
-function M:close()
-	vim.api.nvim_buf_delete(self.buf, { force = true })
-	self.win = nil
-	self.buf = nil
-	if self.callback then
-		self.callback(nil)
-		vim.api.nvim_set_current_win(self.prev_win)
-		self.callback = nil
-	end
 end
 
 function M.left_pad(time_part)
@@ -168,12 +140,13 @@ function M:get_selected_date()
 	if self.select_state ~= SelState.DAY then
 		return self.date
 	end
-	local col = vim.fn.col(".")
-	local char = vim.fn.getline("."):sub(col, col)
-	local day = tonumber(vim.trim(vim.fn.expand("<cword>")))
-	local line = vim.fn.line(".")
+	local col = fn.col(".")
+	local char = fn.getline("."):sub(col, col)
+	local day = tonumber(vim.trim(fn.expand("<cword>")))
+	local line = fn.line(".")
 	vim.cmd([[redraw!]])
 	if line < 3 or not char:match("%d") then
+		return
 		-- return utils.echo_warning("Please select valid day number.", nil, false)
 	end
 	return self.date:set({
@@ -199,35 +172,32 @@ function M:select()
 	self.callback = nil
 
 	vim.cmd([[echon]])
-	vim.api.nvim_win_close(0, true)
-	vim.api.nvim_set_current_win(self.prev_win)
+	api.nvim_win_close(0, true)
+	api.nvim_set_current_win(self.prev_win)
 	return cb(selected_date)
-end
-
----@private
-function M:_ensure_day()
-	if self.select_state ~= SelState.DAY then
-		self:set_day()
-	end
 end
 
 function M:forward()
 	self:_ensure_day()
 	self.date = self.date:set({ day = 1 }):add({ month = vim.v.count1 })
 	self:render()
-	vim.fn.cursor(2, 1)
-	vim.fn.search("01")
+	fn.cursor(2, 1)
+	fn.search("01")
 	self:render()
 end
 
 function M:backward()
-	self:_ensure_day()
 	self.date = self.date:set({ day = 1 }):subtract({ month = vim.v.count1 }):last_day_of_month()
 	self:render()
-	vim.fn.cursor(8, 0)
-	vim.fn.search([[\d\d]], "b")
+	fn.cursor(8, 0)
+	fn.search([[\d\d]], "b")
 	self:render()
 end
+
+local default_hint = {
+	" [<] - prev month  [>] - next month",
+	" [.] - today   [Enter] - select day",
+}
 
 function M:render()
 	vim.bo[self.buf].modifiable = true
@@ -282,92 +252,117 @@ function M:render()
 	table.insert(content, self:render_time())
 	table.insert(content, "")
 
+	vim.list_extend(content, default_hint)
+
 	-- TODO: redundant, since it's static data
-	table.insert(content, " [<] - prev month  [>] - next month")
-	table.insert(content, " [.] - today   [Enter] - select day")
-	if self.clearable then
-		table.insert(content, " [i] - enter date  [r] - clear date")
-	else
-		table.insert(content, " [i] - enter date")
-	end
+	-- if self.clearable then
+	-- 	table.insert(content, " [i] - enter date  [r] - clear date")
+	-- else
+	-- 	table.insert(content, " [i] - enter date")
+	-- end
 
-	if self:has_time() or self.select_state ~= SelState.DAY then
-		if self.select_state == SelState.DAY then
-			table.insert(content, " [t] - enter time  [T] - clear time")
-		else
-			table.insert(content, " [d] - select day  [T] - clear time")
-		end
-	else
-		table.insert(content, " [t] - enter time")
-	end
+	api.nvim_buf_set_lines(self.buf, 0, -1, true, content)
 
-	vim.api.nvim_buf_set_lines(self.buf, 0, -1, true, content)
-	vim.api.nvim_buf_clear_namespace(self.buf, M.namespace, 0, -1)
+	api.nvim_win_set_config(self.win, { height = #content })
+
+	api.nvim_buf_clear_namespace(self.buf, self.namespace, 0, -1)
 
 	vim.bo[self.buf].modifiable = false
 end
 
-function M:hl()
-	-- if self.clearable then
-	-- 	local range = Range:new({
-	-- 		start_line = #content - 2,
-	-- 		start_col = 0,
-	-- 		end_line = #content - 2,
-	-- 		end_col = 1,
-	-- 	})
-	-- 	colors.highlight({
-	-- 		range = range,
-	-- 		hlgroup = "Comment",
-	-- 	}, self.buf)
-	-- 	self:_apply_hl("Comment", #content - 3, 0, -1)
-	-- end
-	--
-	-- if not self:has_time() then
-	-- 	self:_apply_hl("Comment", 8, 0, -1)
-	-- end
-	--
-	-- self:_apply_hl("Comment", #content - 4, 0, -1)
-	-- self:_apply_hl("Comment", #content - 3, 0, -1)
-	-- self:_apply_hl("Comment", #content - 2, 0, -1)
-	-- self:_apply_hl("Comment", #content - 1, 0, -1)
-	--
-	-- for i, line in ipairs(content) do
-	-- 	local from = 0
-	-- 	local to, num
-	--
-	-- 	while true do
-	-- 		from, to, num = line:find("%s(%d%d?)%s", from + 1)
-	-- 		if from == nil then
-	-- 			break
-	-- 		end
-	-- 		if from and to then
-	-- 			local day = self.date:set({ day = num })
-	-- 			self:on_render_day(day, {
-	-- 				from = from,
-	-- 				to = to,
-	-- 				line = i,
-	-- 			})
-	-- 		end
-	-- 	end
-	-- end
-	--
+function M:cursor_left()
+	for _ = 1, vim.v.count1 do
+		local line, col = fn.line("."), fn.col(".")
+		local curr_line = fn.getline(".")
+		local _, offset = curr_line:sub(1, col - 1):find(".*%d%d")
+		if offset ~= nil then
+			fn.cursor(line, offset)
+		end
+	end
+	self.date = self:get_selected_date()
+	self:render()
 end
 
-vim.keymap.set("n", "<Plug>ClendarOpen", function()
-	M:open()
-end)
+function M:cursor_right()
+	for _ = 1, vim.v.count1 do
+		local line, col = fn.line("."), fn.col(".")
+		local curr_line = fn.getline(".")
+		local offset = curr_line:sub(col + 1, #curr_line):find("%d%d")
+		if offset ~= nil then
+			fn.cursor(line, col + offset)
+		end
+	end
+	self.date = self:get_selected_date()
+	self:render()
+end
+
+function M:cursor_up()
+	for _ = 1, vim.v.count1 do
+		local line, col = fn.line("."), fn.col(".")
+		if line > 9 then
+			fn.cursor(line - 1, col)
+			return
+		end
+
+		local prev_line = fn.getline(line - 1)
+		local first_num = prev_line:find("%d%d")
+		if first_num == nil then
+			return
+		end
+
+		local move_to
+		if first_num > col then
+			move_to = first_num
+		else
+			move_to = col
+		end
+		fn.cursor(line - 1, move_to)
+	end
+	self.date = self:get_selected_date()
+	self:render()
+end
+
+function M:cursor_down()
+	for _ = 1, vim.v.count1 do
+		local line, col = fn.line("."), fn.col(".")
+		if line <= 1 then
+			fn.cursor(line + 1, col)
+			return
+		end
+
+		local next_line = fn.getline(line + 1)
+		local _, last_num = next_line:find(".*%d%d")
+		if last_num == nil then
+			return
+		end
+
+		local move_to
+		if last_num < col then
+			move_to = last_num
+		else
+			move_to = col
+		end
+		fn.cursor(line + 1, move_to)
+	end
+	self.date = self:get_selected_date()
+	self:render()
+end
+
+--- TODO: highlight
+function M:hl() end
 
 vim.keymap.set("n", "<leader>id", function()
-	M:open(config.actions.insert_link)
+	local cal = M.new({}, config.actions.insert)
+	cal:open()
 end)
 
 vim.keymap.set("i", "@", function()
-	local pos = vim.api.nvim_win_get_cursor(0)
-	vim.api.nvim_put({ "@" }, "c", true, true)
-	vim.cmd.stopinsert()
-	M:open(config.actions.insert_link, {
+	api.nvim_put({ "@" }, "c", true, true)
+	-- vim.cmd.stopinsert()
+	local cal = M.new({
 		relative = "cursor",
 		row = 1,
-		col = -1,
-	})
+		col = 0,
+	}, config.actions.insert)
+	-- cal:open()
 end)
