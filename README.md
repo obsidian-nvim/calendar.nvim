@@ -5,6 +5,7 @@
 ## Idea
 
 - Like emacs's builtin calendar, `calendar-vim`, be a capable yet minimal calendar.
+- As less vim script functions as possible
 - Supports customizable callbacks for any app you want to build
 - Flexible Layouts, ordered as planned:
   1. Center, one month popup, like orgmode(nvim)
@@ -30,6 +31,7 @@ Three parts:
     - insert dates
     - echo dates
     - open journal of dates
+- `highlight`: responsible for highlight according to view
 
 ## Acknowledgements
 

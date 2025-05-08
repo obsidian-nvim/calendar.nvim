@@ -352,19 +352,3 @@ end
 
 --- TODO: highlight
 function M:hl() end
-
-vim.keymap.set("n", "<leader>id", function()
-	local cal = M.new({}, config.actions.insert)
-	cal:open()
-end)
-
-vim.keymap.set("i", "@", function()
-	api.nvim_put({ "@" }, "c", true, true)
-	-- vim.cmd.stopinsert()
-	local cal = M.new({
-		relative = "cursor",
-		row = 1,
-		col = 0,
-	}, config.actions.insert)
-	-- cal:open()
-end)
