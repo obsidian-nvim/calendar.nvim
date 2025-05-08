@@ -104,123 +104,44 @@ do
 	patterns.ASCTIME = alpha * ws * alpha * ws * digit * ws * digit * ws * digit * col * digit * col * digit * ws -- TODO: zone
 end
 
+local date_to_osdate = function(t)
+	return os.date("*t", os.time(t))
+end
+
 ---@param str string
----@return integer?
-local function asctime(str)
+function M.asctime(str)
 	local weekday, month, day, year, hour, min, sec, _ = patterns.ASCTIME:match(str)
 	if not weekday then
 		return nil
 	end
-	return os.time({ year = year, month = month, day = day, hour = hour, min = min, sec = sec })
+	return date_to_osdate({ year = year, month = month, day = day, hour = hour, min = min, sec = sec })
 end
 
 ---@param str string
----@return integer?
-local function rfc2822(str)
+function M.rfc2822(str)
 	local weekday, day, month, year, hour, min, sec, _ = patterns.RFC2822:match(str)
 	if not weekday then
 		return nil
 	end
-	return os.time({ year = year, month = month, day = day, hour = hour, min = min, sec = sec })
+	return date_to_osdate({ year = year, month = month, day = day, hour = hour, min = min, sec = sec })
 end
 
 ---@param str string
----@return integer?
-local function rfc3339(str)
+function M.rfc3339(str)
 	local year, month, day, hour, min, sec, _ = patterns.RFC3339:match(str)
 	if not year then
 		return nil
 	end
-	return os.time({ year = year, month = month, day = day, hour = hour, min = min, sec = sec })
+	return date_to_osdate({ year = year, month = month, day = day, hour = hour, min = min, sec = sec })
 end
 
 ---@param str string
----@return integer?
-local function W3CDTF(str)
+function M.W3CDTF(str)
 	local a, b, c = unpack(vim.split(str, "-"))
 	if not a then
 		return
 	end
-	return os.time({ year = tonumber(a) or 1, month = tonumber(b) or 1, day = tonumber(c) or 1 })
-end
-
-local order = {
-	rfc3339,
-	rfc2822,
-	asctime,
-	W3CDTF,
-}
-
----@param str string
----@param t "rss" | "atom" | "json"
----@return integer
-M.parse = function(str, t)
-	if str then
-		if t == "json" then
-			local time = rfc3339(str)
-			if time then
-				return time
-			end
-		else
-			for _, f in ipairs(order) do
-				local time = f(str)
-				if time then
-					return time
-				end
-			end
-		end
-	end
-	return os.time()
-end
-
-local function literal(str)
-	local a, unit, ago = unpack(vim.split(str, "-"))
-	local n = tonumber(a)
-	if n and unit and ago then
-		if unit:find("day") then
-			return days_ago(n)
-		elseif unit:find("week") then
-			return weeks_ago(n)
-		elseif unit:find("month") then
-			return months_ago(n)
-		elseif unit:find("year") then
-			return years_ago(n)
-		end
-	end
-end
-
----@param str string
----@return integer?
-local function numeral(str)
-	local a, b, c = unpack(vim.split(str, "-"))
-	local an, bn, cn = tonumber(a), tonumber(b), tonumber(c)
-	if an and bn and cn then
-		return os.time({ year = an, month = bn, day = cn })
-	end
-end
-
----@param str string
----@return integer?
-local function filter_part(str)
-	for _, f in ipairs({ literal, numeral }) do
-		if f(str) then
-			return f(str)
-		end
-	end
-end
-
----@param str string
----@return integer?
----@return integer?
-function M.parse_filter(str)
-	local sep = string.find(str, "%-%-")
-	if not sep then
-		str = string.sub(str, 2, #str)
-		return filter_part(str), nil
-	else
-		local start, stop = string.sub(str, 2, sep - 1), string.sub(str, sep + 2, #str)
-		return filter_part(start), filter_part(stop)
-	end
+	return date_to_osdate({ year = tonumber(a) or 1, month = tonumber(b) or 1, day = tonumber(c) or 1 })
 end
 
 return M

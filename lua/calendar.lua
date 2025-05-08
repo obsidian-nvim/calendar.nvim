@@ -1,5 +1,5 @@
 -- Adapted from nvim-orgmode/orgmode
-local Date = require("calendar.date")
+local Date = require("calendar._date")
 local config = require("calendar.config")
 local api, fn = vim.api, vim.fn
 
@@ -12,7 +12,9 @@ local function new_date(opts)
 	local date = opts.date
 
 	if type(date) == "function" then
-		return date()
+		local line = api.nvim_get_current_line()
+		local col = api.nvim_win_get_cursor(0)[2] -- 0-indexed
+		return date(line, col)
 	elseif type(date) == "table" then -- TODO: check if mt is Date obj
 		return date
 	else
