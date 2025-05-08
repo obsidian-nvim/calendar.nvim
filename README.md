@@ -1,6 +1,6 @@
 # calendar.nvim
 
-Calendar library for neovim
+**WIP** Calendar library for neovim
 
 ## Idea
 
@@ -14,9 +14,22 @@ Calendar library for neovim
 
 Three parts:
 
-- `ui`
-- `date_parser`
-- `actions`
+- `date`: Contains all the logic of calculating dates
+  - `parser`: parse date strings
+  - `writer`: outputs formatted dates
+- `calendar`: Contains all the logic of operation of a calendar
+  - All the views/layouts
+  - custom everything by ftplugin
+    - winhighlight
+    - winborder
+    - ...
+- `actions`: customizable and provide utils for ease of defining
+  - opening actions:
+    - open the date under cursor
+  - confirm actions:
+    - insert dates
+    - echo dates
+    - open journal of dates
 
 ## Acknowledgements
 
