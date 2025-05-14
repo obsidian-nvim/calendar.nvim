@@ -1,5 +1,5 @@
 -- Adapted from nvim-orgmode/orgmode
-local Date = require("calendar.date")
+local Date = require("calendar._date")
 local config = require("calendar.config")
 local api, fn = vim.api, vim.fn
 
@@ -47,9 +47,9 @@ function M:win_opts()
 		width = width,
 		height = height,
 		style = "minimal",
-		border = "single",
+		border = opts.border or "single",
 		row = opts.row or vim.o.lines / 2 - (y_offset + height) / 2,
-		col = opts.co or vim.o.columns / 2 - (x_offset + width) / 2,
+		col = opts.col or vim.o.columns / 2 - (x_offset + width) / 2,
 		title = self.title or "Calendar",
 		title_pos = "center",
 	}
@@ -181,7 +181,6 @@ function M:select()
 end
 
 function M:forward()
-	self:_ensure_day()
 	self.date = self.date:set({ day = 1 }):add({ month = vim.v.count1 })
 	self:render()
 	fn.cursor(2, 1)
@@ -354,6 +353,4 @@ end
 --- TODO: highlight
 function M:hl() end
 
-local cal = M.new()
-
-cal:open()
+return M

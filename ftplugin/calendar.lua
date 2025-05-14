@@ -6,6 +6,9 @@ vim.bo.bufhidden = "wipe"
 
 vim.b["indent_blankline_enabled"] = false
 
+-- TODO: define our won
+vim.wo.winhighlight = "Normal:BlinkCmpMenu,FloatBorder:BlinkCmpMenuBorder,CursorLine:BlinkCmpMenuSelection,Search:None"
+
 -- vim.cmd([[
 --    hi def link CalNavi     Search
 --    hi def link CalSaturday Statement
