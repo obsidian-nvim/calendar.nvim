@@ -75,6 +75,7 @@ function M:format(format)
    return os.date(format, int)
 end
 
+---@return Calendar.date
 function M:start_of(span)
    local opts = {
       day = { hour = 0, min = 0 },
@@ -85,8 +86,8 @@ function M:start_of(span)
    local new_attrs = opts[span]
 
    -- TODO: week
-   local copy = vim.deepcopy(self)
-   return vim.tbl_extend("force", copy, new_attrs)
+   local obj = vim.tbl_extend("force", vim.deepcopy(self), new_attrs)
+   return setmetatable(obj, M)
 end
 
 ---@return boolean
@@ -154,40 +155,64 @@ function M:set(opts)
    return vim.tbl_extend("force", copy, opts)
 end
 
--- ---@param opts OrgDateSetOpts
--- ---@return OrgDate
--- function OrgDate:set(opts)
--- 	local data = {
--- 		day = self.day,
--- 		month = self.month,
--- 		year = self.year,
--- 		hour = self.hour,
--- 		min = self.min,
--- 		date_only = self.date_only,
--- 		type = self.type,
--- 		range = self.range,
--- 		active = self.active,
--- 		adjustments = self.adjustments,
--- 		is_date_range_start = self.is_date_range_start,
--- 		is_date_range_end = self.is_date_range_end,
--- 		related_date = self.related_date,
--- 	}
---
--- 	if type(opts.date_only) == "boolean" then
--- 		data.date_only = opts.date_only
--- 	end
---
--- 	for key, value in pairs(opts) do
--- 		data[key] = value
--- 	end
---
--- 	if self.timestamp_end then
--- 		local range_diff = self.timestamp_end - self.timestamp
--- 		local timestamp = os.time(data)
--- 		data.timestamp_end = timestamp + range_diff
--- 	end
---
--- 	return OrgDate:new(data)
--- end
+---@param isoweekday number
+---@return number
+local function convert_from_isoweekday(isoweekday)
+   if isoweekday == 7 then
+      return 1
+   end
+   return isoweekday + 1
+end
+
+---@param weekday number
+---@return number
+local function convert_to_isoweekday(weekday)
+   if weekday == 1 then
+      return 7
+   end
+   return weekday - 1
+end
+
+---@return number
+function M:get_weekday()
+   return tonumber(self.wday) or 0
+end
+
+function M:get_isoweekday()
+   local wday = tonumber(self.wday)
+   assert(wday, "invalid weekday")
+   return convert_to_isoweekday(wday)
+end
+
+--- TODO: metadata, lazy compute field
+
+---@param obj osdateparam
+---@return integer
+local get_timestamp = function(obj)
+   return os.time({
+      year = obj.year,
+      month = obj.month,
+      day = obj.day,
+      hour = obj.hour or 0,
+      min = obj.min or 0,
+   })
+end
+
+---Range of dates, excluding date
+---@param date Calendar.date
+---@return Calendar.date[]
+function M:get_range_until(date)
+   local this = self
+   local dates = {}
+   local this_time, util_time = get_timestamp(self), get_timestamp(date)
+
+   while this_time < util_time do
+      table.insert(dates, this)
+      -- TODO:
+      -- this = this:add({ day = 1 })
+   end
+
+   return dates
+end
 
 return M

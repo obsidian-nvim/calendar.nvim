@@ -1,5 +1,5 @@
 -- Adapted from nvim-orgmode/orgmode
-local Date = require("calendar._date")
+local Date = require("calendar.date")
 local config = require("calendar.config")
 local api, fn = vim.api, vim.fn
 
@@ -171,7 +171,7 @@ function M:select()
       })
       self.select_state = SelState.DAY
    end
-   local cb = self.callback
+   local cb = self.callback or print
    self.callback = nil
 
    vim.cmd([[echon]])
@@ -352,5 +352,8 @@ end
 
 --- TODO: highlight
 function M:hl() end
+
+local cal = M.new()
+cal:open()
 
 return M
