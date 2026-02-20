@@ -1,4 +1,7 @@
 return {
+	lsp = {
+		enabled = true,
+	},
 	actions = {
 		insert = function(date)
 			return vim.api.nvim_put({ date:format("%Y-%m-%d") }, "c", true, true)

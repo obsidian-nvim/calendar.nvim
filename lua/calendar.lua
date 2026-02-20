@@ -12,6 +12,7 @@ local api, fn = vim.api, vim.fn
 ---@field opts table
 ---@field callback function
 ---@field day_hl table<string, string> map of date keys to hlgroups
+---@field lsp CalendarLspOpts
 local M = {}
 
 M.__index = M
@@ -35,6 +36,14 @@ end
 ---@return Calendar
 function M.new(opts)
    opts = opts or {}
+   local lsp_opts
+   if type(opts.lsp) == "table" then
+      lsp_opts = vim.tbl_deep_extend("force", config.lsp or {}, opts.lsp)
+   elseif opts.lsp ~= nil then
+      lsp_opts = vim.tbl_deep_extend("force", config.lsp or {}, { enabled = not not opts.lsp })
+   else
+      lsp_opts = vim.deepcopy(config.lsp or {})
+   end
    return setmetatable({
       win = nil,
       buf = nil,
@@ -44,6 +53,7 @@ function M.new(opts)
       opts = opts,
       callback = opts.callback or config.actions.echo,
       day_hl = {},
+      lsp = lsp_opts,
    }, M)
 end
 
@@ -111,6 +121,10 @@ function M.open(self)
    self.buf = api.nvim_create_buf(false, true)
    self.win = api.nvim_open_win(self.buf, true, self:win_opts())
    vim.bo[self.buf].filetype = "nvim-calendar" -- triggers ftplugin options
+   vim.b[self.buf].calendar_instance = self
+   if self.lsp and self.lsp.enabled ~= false then
+      require("calendar.lsp").attach(self.buf, self.lsp)
+   end
    self:render()
    self.augroup = api.nvim_create_augroup("calendar.nvim", { clear = true })
    set_events(self)
