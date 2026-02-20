@@ -12,6 +12,8 @@
   2. Follow Cursor [reference](https://publish.obsidian.md/kanban/Settings/Date+trigger)
   3. Side pannel, three month, like neorg's and [calendar-vim](https://github.com/nvim-telekasten/calendar-vim)
   4. _Long Term Goal_ Calendar app view [calendar.vim](https://github.com/itchyny/calendar.vim)
+  5. Heatmap
+  6. Agenda view
 
 Three parts:
 
