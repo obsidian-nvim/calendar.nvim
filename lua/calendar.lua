@@ -3,6 +3,15 @@ local Date = require("calendar.date")
 local config = require("calendar.config")
 local api, fn = vim.api, vim.fn
 
+---@class Calendar
+---@field win number?
+---@field buf number?
+---@field namespace number
+---@field select_state number
+---@field date OrgDate
+---@field opts table
+---@field callback function
+---@field day_hl table<string, string> map of date keys to hlgroups
 local M = {}
 
 M.__index = M
@@ -22,7 +31,9 @@ local function new_date(opts)
    end
 end
 
-function M.new(opts, callback)
+---@param opts table
+---@return Calendar
+function M.new(opts)
    opts = opts or {}
    return setmetatable({
       win = nil,
@@ -31,7 +42,8 @@ function M.new(opts, callback)
       select_state = 0,
       date = new_date(opts),
       opts = opts,
-      callback = callback or config.actions.echo_date,
+      callback = opts.callback or config.actions.echo,
+      day_hl = {},
    }, M)
 end
 
@@ -98,7 +110,7 @@ function M.open(self)
    self.prev_win = api.nvim_get_current_win()
    self.buf = api.nvim_create_buf(false, true)
    self.win = api.nvim_open_win(self.buf, true, self:win_opts())
-   vim.bo[self.buf].filetype = "calendar" -- triggers all ftplugin options
+   vim.bo[self.buf].filetype = "nvim-calendar" -- triggers ftplugin options
    self:render()
    self.augroup = api.nvim_create_augroup("calendar.nvim", { clear = true })
    set_events(self)
@@ -201,6 +213,18 @@ local default_hint = {
    " [.] - today   [Enter] - select day",
 }
 
+local function date_key(date)
+   return date:format("%Y-%m-%d")
+end
+
+function M:set_hl(date, hlgroup)
+   local key = date_key(date)
+   self.day_hl[key] = hlgroup
+   if self.buf then
+      self:render()
+   end
+end
+
 function M:render()
    vim.bo[self.buf].modifiable = true
 
@@ -268,6 +292,25 @@ function M:render()
    api.nvim_win_set_config(self.win, { height = #content })
 
    api.nvim_buf_clear_namespace(self.buf, self.namespace, 0, -1)
+
+   for line_idx, line in ipairs(content) do
+      local from = 0
+      while true do
+         local start_col, end_col, day_str = line:find("%s(%d%d?)%s", from + 1)
+         if not start_col then
+            break
+         end
+         local day = tonumber(day_str)
+         if day then
+            local day_date = self.date:set({ day = day })
+            local hlgroup = self.day_hl[date_key(day_date)]
+            if hlgroup then
+               api.nvim_buf_add_highlight(self.buf, self.namespace, hlgroup, line_idx - 1, start_col, end_col - 1)
+            end
+         end
+         from = end_col
+      end
+   end
 
    vim.bo[self.buf].modifiable = false
 end
@@ -352,8 +395,5 @@ end
 
 --- TODO: highlight
 function M:hl() end
-
-local cal = M.new()
-cal:open()
 
 return M
